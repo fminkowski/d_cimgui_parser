@@ -1,0 +1,15 @@
+.dub
+docs.json
+__dummy.html
+docs/
+/dimgui
+dimgui.so
+dimgui.dylib
+dimgui.dll
+dimgui.a
+dimgui.lib
+dimgui-test-*
+*.exe
+*.o
+*.obj
+*.lst

@@ -1,0 +1,12 @@
+{
+	"authors": [
+		"Fred Minkowski"
+	],
+	"dependencies": {
+        "derelict-glfw3": "~>4.0.0-beta.1"
+	},
+	"copyright": "Copyright © 2019, Fred Minkowski",
+	"description": "D dear imgui wrapper",
+	"license": "MIT",
+	"name": "dimgui"
+}
