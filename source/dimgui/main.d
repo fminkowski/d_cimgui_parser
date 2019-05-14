@@ -1,6 +1,8 @@
 module dimgui.dimgui;
 import std.json;
 import dimgui.test;
+import std.string;
+import std.stdio;
 
 //import dimgui.gen;
 
@@ -36,8 +38,6 @@ string remove_const(string v) {
 unittest {
 
     void test(string v, string expected) {
-        import std.string;
-        import std.stdio;
         auto r = remove_const(v);
         assert(r.indexOf("const") == -1);
         assert(r == expected);
@@ -52,7 +52,6 @@ unittest {
 }
 
 string parse_ref(string v) {
-    import std.string;
     const auto contains_ref_op = v.indexOf("&") != -1;
     if (contains_ref_op) {
         v = v.replace("&", "");
@@ -126,7 +125,6 @@ string parse_name(string arg_name) {
 
 string parse_func(string ret, string args_str, string arg_name = "", bool is_type = true) {
     import std.algorithm.iteration;
-    import std.string;
     import std.array;
     
     auto parsed_args = args_str
@@ -295,7 +293,6 @@ string format_enum_value(JSONValue value) {
 }
 
 string parse_enums(JSONValue enums) {
-    import std.stdio;
     string result;
     foreach (enum_name, enum_values; enums.object) {
         string enum_result = nl("enum {");
@@ -309,7 +306,6 @@ string parse_enums(JSONValue enums) {
 }
 
 string maybe_get_array_bounds_from_name(string name) {
-    import std.string;
     auto index1 = name.indexOf("[");
     if (index1 == -1) return "";
 
@@ -330,7 +326,6 @@ unittest {
 }
 
 string remove_array_bounds(string name) {
-    import std.string;
     auto index1 = name.indexOf("[");
     if (index1 == -1) return name;
 
@@ -350,7 +345,6 @@ unittest {
 }
 
 string get_struct_member_function_ret(string v) {
-    import std.string;
     auto index1 = v.indexOf("(");
     return v[0 .. index1];
 }
@@ -361,7 +355,6 @@ unittest {
 }
 
 string get_struct_member_function_args(string v) {
-    import std.string;
     auto index1 = v.indexOf(")");
 
     auto params = v[index1 + 1 .. $];
@@ -396,12 +389,10 @@ unittest {
 
 bool is_function_def(string v) {
     //todo: make this more robust. right now it is very dumb
-    import std.string;
     return v.indexOf("(") != -1;
 }
 
 bool is_struct(string v) {
-    import std.string;
     return v.indexOf("struct") != -1;
 }
 
@@ -441,7 +432,6 @@ unittest {
 }
 
 string parse_structs(JSONValue structs, string[] defs_to_exclude) {
-    import std.stdio;
     import std.algorithm: canFind;
     string result;
     foreach (struct_name, struct_values; structs.object) {
@@ -467,8 +457,6 @@ string parse_structs_and_enums(string text, string[] defs_to_exclude) {
 }
 
 string parse_typedefs(string text, string[] defs_to_exclude) {
-    import std.stdio;
-    import std.string;
     import std.algorithm: canFind;
 
     auto j = parseJSON(text);
@@ -519,21 +507,21 @@ string[] get_structs(string text) {
 
 string build_binds() {
     auto r = `
-    import core.sys.posix.dlfcn;
-    import std.string;
+import core.sys.posix.dlfcn;
+import std.string;
 
-    void* get_shared_handle(string shared_library) {
-        return dlopen(toStringz(shared_library), RTLD_NOW);
-    }
+void* get_shared_handle(string shared_library) {
+    return dlopen(toStringz(shared_library), RTLD_NOW);
+}
 
-    T bind(T)(void* handle, string name) {
-        import std.stdio;
-        auto r = cast(T)dlsym(handle, toStringz(name));
-        if (!r) {
-            writeln("Could not find symbol " ~ name);
-        }
-        return r;
+T bind(T)(void* handle, string name) {
+    import std.stdio;
+    auto r = cast(T)dlsym(handle, toStringz(name));
+    if (!r) {
+        writeln("Could not find symbol " ~ name);
     }
+    return r;
+}
 `;
 
     r ~= nl("bool load_imgui_lib(string shared_library) {");
@@ -553,7 +541,6 @@ string build_binds() {
 
 void run() {
     import std.file;
-    import std.stdio;
 
     string result;
     result ~= nl("module dimgui;");

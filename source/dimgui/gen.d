@@ -1681,22 +1681,22 @@ alias int ImGuiColorEditFlags;
 alias uint ImU64;
 alias ubyte ImU8;
 
-    import core.sys.posix.dlfcn;
-    import std.string;
+import core.sys.posix.dlfcn;
+import std.string;
 
-    void* get_shared_handle(string shared_library) {
-        return dlopen(toStringz(shared_library), RTLD_NOW);
-    }
+void* get_shared_handle(string shared_library) {
+    return dlopen(toStringz(shared_library), RTLD_NOW);
+}
 
-    T bind(T)(void* handle, string name) {
-        import std.stdio;
-        auto r = cast(T)dlsym(handle, toStringz(name));
-        if (!r) {
-            writeln("Could not find symbol " ~ name);
-        }
-        return r;
+T bind(T)(void* handle, string name) {
+    import std.stdio;
+    auto r = cast(T)dlsym(handle, toStringz(name));
+    if (!r) {
+        writeln("Could not find symbol " ~ name);
     }
-bool load_dimgui_lib(string shared_library) {
+    return r;
+}
+bool load_imgui_lib(string shared_library) {
 
     auto handle = get_shared_handle(shared_library);
     if (!handle) {
