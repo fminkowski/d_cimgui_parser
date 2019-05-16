@@ -1961,7 +1961,7 @@ T bind(T)(void* handle, string name) {
     }
     return r;
 }
-bool load_imgui_lib(string shared_library) {
+bool dimgui_load_lib(string shared_library) {
 
     auto handle = get_shared_handle(shared_library);
     if (!handle) {

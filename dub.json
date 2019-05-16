@@ -8,5 +8,5 @@
 	"copyright": "Copyright © 2019, Fred Minkowski",
 	"description": "D dear imgui wrapper",
 	"license": "MIT",
-	"name": "dimgui"
+	"name": "d_cimgui_parser"
 }

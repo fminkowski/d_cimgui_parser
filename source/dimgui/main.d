@@ -512,7 +512,7 @@ T bind(T)(void* handle, string name) {
 }
 `;
 
-    r ~= nl("bool load_imgui_lib(string shared_library) {");
+    r ~= nl("bool dimgui_load_lib(string shared_library) {");
     r ~= nl(`
     auto handle = get_shared_handle(shared_library);
     if (!handle) {
