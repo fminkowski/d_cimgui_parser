@@ -3,24 +3,69 @@ import std.json;
 import dimgui.test;
 import std.string;
 import std.stdio;
+import std.algorithm: canFind;
+import std.array;
+import std.conv : to;
+import std.algorithm.iteration;
 
-//import dimgui.gen;
 
-struct decl {
-    string type;
-    string name;
+string nl(alias T = 1)(string v) {
+    return v ~ "\n".replicate(T);
 }
 
-decl[] decls;
+class function_decl {
+    import std.conv : to;
+    string return_type;
+    string name;
+    string args;
+    string type_name;
+
+    this(string return_type, string name, string args) {
+        this.return_type = return_type;
+        this.name = name;
+        this.args = args;
+    }
+
+    void set_type_name(string type_name) {
+        this.type_name = type_name;
+    }
+
+    string to_named_string() {
+        return "%s %s(%s)".format(return_type, name, args);
+
+    }
+
+    string to_type_string() {
+        return "%s function(%s)".format(return_type, args);
+
+    }
+}
+
+string parse_json_value_to_str(JSONValue v) {
+    import std.conv;
+    string result;
+    if (v.type == JSONType.integer) {
+        result = to!string(v.integer);
+    } else if (v.type == JSONType.true_ || v.type == JSONType.false_) {
+        result = to!string(v.boolean);
+    } else if (v.type == JSONType.string) {
+        result = v.str;
+    }
+    return result;
+}
+
+string parse_json_value(alias T)(JSONValue v) {
+    return parse_json_value_to_str(v[T]);
+}
 
 string get_return_type(JSONValue element) {
     string return_type;
     if ("constructor" in element) {
-        return_type = element["stname"].str ~ "*";
+        return_type = "%s*".format(parse_json_value!"stname"(element));
     } else {
-        return_type = element["ret"].str;
+        return_type = parse_json_value!"ret"(element);
     }
-    return return_type;
+    return remove_const(return_type);
 }
 
 string remove_const(string v) {
@@ -36,7 +81,6 @@ string remove_const(string v) {
 }
 
 unittest {
-
     void test(string v, string expected) {
         auto r = remove_const(v);
         assert(r.indexOf("const") == -1);
@@ -51,14 +95,25 @@ unittest {
     test("const int const*", "int*");
 }
 
+string wrap_extern_c(string v) {
+    return nl("extern(C) @nogc nothrow {") ~ v ~ "}";
+}
+
+string to_lines(T)(T[] values) {
+    string result;
+    foreach (v; values) {
+        result ~= nl("%s;".format(v));
+    }
+    return result;
+}
+
 string parse_ref(string v) {
     const auto contains_ref_op = v.indexOf("&") != -1;
     if (contains_ref_op) {
         v = v.replace("&", "");
-        v = "ref " ~ v;
+        v = "ref %s".format(v);
     }
     return v;
-
 }
 
 unittest {
@@ -114,16 +169,25 @@ unittest {
 string parse_name(string arg_name) {
     string result = arg_name;
     switch (arg_name) {
-        case "out": result = "out_val"; break;
-        case "in": result = "in_val"; break;
-        case "ref": result = "ref_val"; break;
+        case "out": result = "out_"; break;
+        case "in": result = "in_"; break;
+        case "ref": result = "ref_"; break;
         case "...": result = "args"; break;
         default: break;
     }
     return result;
 }
 
-string parse_func(string ret, string args_str, string arg_name = "", bool is_type = true) {
+struct arg {
+    string type;
+    string name;
+
+    string toString() {
+        return "%s %s".format(type, name);
+    }
+}
+
+string parse_func(string ret, string args_str, string name) {
     import std.algorithm.iteration;
     import std.array;
     
@@ -139,155 +203,101 @@ string parse_func(string ret, string args_str, string arg_name = "", bool is_typ
         formatted_args ~= a.toString;
     }
 
-    auto result = parse_type(ret) ~ " " ~ (is_type ? "function" : arg_name) ~ "(";
+    auto result = "%s %s(".format(parse_type(ret), name);
     foreach (i, f; formatted_args) {
         result ~= f;
         result ~= (i != formatted_args.length - 1) ? ", " : "";
     }
     result ~= ")";
-    if (arg_name != "" && is_type) {
-        result ~= " " ~ arg_name;
-    }
     return result;
 }
 
-struct arg {
-    string arg_type;
-    string arg_name;
-    string func_ret;
-    string func_sig;
-
-    private bool is_func() {
-        return func_ret != null && func_ret != "";
-    }
-
-    string toString(){
-        return is_func()
-            ? parse_func(func_ret, func_sig, arg_name)
-            : parse_type(arg_type) ~ " " ~ parse_name(arg_name);
-    }
-}
-
 string parse_args(JSONValue element) {
-
     import std.string;
-    arg[] args;
+    string[] args;
     foreach (k, e; element.array) {
-        args ~= arg(
-            e["type"].str,
-            e["name"].str,
-            "ret" in e ? e["ret"].str : "",
-            "signature" in e ? e["signature"].str : ""
-        );
+        auto name = parse_json_value!"name"(e);
+        if ("ret" in e) {
+            // function argument
+            args  ~= "%s %s".format(parse_func(
+                    parse_json_value!"ret"(e),
+                    parse_json_value!"signature"(e),
+                    "function"
+                ), name);
+        } else {
+            // standard argument
+            auto type = parse_json_value!"type"(e);
+            args ~= arg(remove_const(parse_type(type)), parse_name(name)).toString;
+        }
     }
 
     string result;
     foreach (i, a; args) {
-       result ~= a.toString();
+       result ~= a;
        result ~= (i != args.length - 1) ? ", " : "";
     }
     return result;
 }
 
-string make_statement_type(string name, int count) {
-    import std.conv : to;
-    return name ~ "_t" ~ to!string(count);
-}
-
-string make_type_alias(JSONValue element, int count) {
-    const auto cimgui_name = parse_json_value(element["ov_cimguiname"]);
-    const auto return_type = get_return_type(element);
-    auto type_alias = "alias " ~
-        make_statement_type(cimgui_name, count) ~
-        " = " ~
-        remove_const(return_type) ~
-        " function(" ~
-        parse_args(element["argsT"]) ~
-        ")";
-   return type_alias; 
-}
-
-decl make_decl(JSONValue element, int count) {
-    const auto cimgui_name = parse_json_value(element["ov_cimguiname"]);
-    return decl(make_statement_type(cimgui_name, count), cimgui_name);
-}
-
-string to_lines(T)(T[] values) {
-    string result;
-    foreach (v; values) {
-        result ~= v ~ ";\n";
-    }
-    return result;
-}
-
-string nl(string v) {
-    return v ~ "\n";
-}
-
-string wrap_extern_c(string v) {
-    return nl(nl("extern(C) @nogc nothrow {")) ~ v ~ nl("}");
-}
-
-string parse_definitions(string text) {
-    import std.algorithm.iteration;
-    import std.algorithm : canFind;
-    import std.array;
+function_decl[] parse_definitions(string text) {
     auto j = parseJSON(text);
 
     string result;
     string[] cimgui_names;
     string[] type_aliases;
+    function_decl[] function_decls;
     foreach (k, values; j.object) {
         int count;
         foreach (k2, v; values.array) {
-            const auto name = parse_json_value(v["ov_cimguiname"]);
+            const auto name = parse_json_value!"ov_cimguiname"(v);
             const auto args = parse_args(v["argsT"]);
             const auto return_type = get_return_type(v);
 
-            bool delegate(string) is_excluded = (t) => name.canFind(t) || args.canFind(t) || return_type.canFind(t);
+            auto is_excluded = (string t) => name.canFind(t) || args.canFind(t) || return_type.canFind(t);
             if (
-                is_excluded("ImVec") ||
-                is_excluded("SDL") ||
                 is_excluded("SDL") ||
                 is_excluded("OpenGL2") ||
-                is_excluded("ImColor")) continue;
+                is_excluded("ImVector") ||
+                is_excluded("ImVec2_Simple") ||
+                is_excluded("ImVec4_Simple") ||
+                is_excluded("ImColor_Simple")) continue;
 
-            type_aliases ~= make_type_alias(v, count);
-            auto decl = make_decl(v, count);
-            decls ~= decl;
-            cimgui_names ~= decl.type ~ " " ~ decl.name;
+            auto function_decl = new function_decl(return_type, name, parse_args(v["argsT"]));
+            function_decl.set_type_name("%s_t%s".format(name, count.to!string));
+            function_decls ~= function_decl;
             count++;
         }
     }
 
-    auto type_result = wrap_extern_c(type_aliases.uniq.array.to_lines);
-    result ~= nl(type_result);
+    return function_decls;
+}
 
-    auto decls = nl("__gshared {");
-    decls ~= cimgui_names.uniq.array.to_lines;
-    decls ~= nl("}");
-    result ~= nl(decls);
-
+string format_function_decls_alias_str(function_decl[] function_decls) {
+    string result;
+    string type_aliases;
+    foreach (f; function_decls) {
+        type_aliases ~= nl("alias %s = %s;".format(f.type_name, f.to_type_string));
+    }
+    result ~= wrap_extern_c(type_aliases);
     return result;
 }
 
-string parse_json_value(JSONValue v) {
-    import std.conv;
+string format_function_decls_str(function_decl[] function_decls) {
     string result;
-    if (v.type == JSONType.integer) {
-        result = to!string(v.integer);
-    } else if (v.type == JSONType.true_ || v.type == JSONType.false_) {
-        result = to!string(v.boolean);
-    } else if (v.type == JSONType.string) {
-        result = v.str;
+    string function_declarations;
+    foreach (f; function_decls) {
+        function_declarations ~= nl("%s %s;".format(f.type_name, f.name));
     }
+    result ~= nl("__gshared {");
+    result ~= function_declarations;
+    result ~= "}";
     return result;
 }
 
 string format_enum_value(JSONValue value) {
-    string result = parse_json_value(value["name"]);
+    string result = parse_json_value!"name"(value);
     if ("value" in value) {
-        result ~= " = " ~ parse_json_value(value["value"]);
+        result ~= " = " ~ parse_json_value!"value"(value);
     }
     return result; 
 }
@@ -297,7 +307,7 @@ string parse_enums(JSONValue enums) {
     foreach (enum_name, enum_values; enums.object) {
         string enum_result = nl("enum {");
         foreach (k, v; enum_values.array) {
-            enum_result ~= nl("    " ~ format_enum_value(v) ~ ",");
+            enum_result ~= nl("    %s,".format(format_enum_value(v)));
         }
         enum_result ~= nl("}");
         result ~= nl(enum_result);
@@ -344,47 +354,28 @@ unittest {
 
 }
 
-string get_struct_member_function_ret(string v) {
+string get_struct_member_function_return_type(string v) {
     auto index1 = v.indexOf("(");
-    return v[0 .. index1];
+    return remove_const(v[0 .. index1]);
 }
 
 unittest {
-    auto result = get_struct_member_function_ret("void(*)(int abc)");
+    auto result = get_struct_member_function_return_type("void(*)(int abc)");
     assert(result == "void");
 }
 
 string get_struct_member_function_args(string v) {
     auto index1 = v.indexOf(")");
-
     auto params = v[index1 + 1 .. $];
-    return params;
+    return remove_const(params);
 }
 
 unittest {
     auto result = get_struct_member_function_args("void(*)(int a)");
-    assert(result == "(int a)");
+    areEqual("(int a)", result);
 
     result = get_struct_member_function_args("void(*)(int a, char c)");
-    assert(result == "(int a, char c)");
-
-}
-
-string parse_function_def(string name, string type) {
-    auto no_const = remove_const(type);
-    auto ret = get_struct_member_function_ret(no_const);
-    auto args = get_struct_member_function_args(no_const);
-    string func = "alias " ~ name ~ " = " ~ parse_func(ret, args, "", true);
-    return func;
-}
-
-unittest {
-    void test(string name, string type, string expected, int line = __LINE__) {
-        auto result = parse_function_def(name, type);
-        areEqual(expected, result, "", __FILE__, line);
-    }
-    test("test", "void(*)(void* user_data)", "void test(void* user_data)");
-    test("test", "void(*)(void* user_data,const char* text)", "void test(void* user_data, char* text)");
+    areEqual("(int a, char c)", result);
 }
 
 bool is_function_def(string v) {
@@ -401,11 +392,13 @@ unittest {
     isFalse(is_struct("val"));
 }
 
-string format_struct_value(JSONValue v) {
-    auto name = parse_json_value(v["name"]);
-    auto type = parse_json_value(v["type"]);
+string format_struct_value(string type, string name) {
     if (is_function_def(type)) {
-        return parse_function_def(name, type);
+        auto no_const = remove_const(type);
+        auto ret = get_struct_member_function_return_type(no_const);
+        auto args = get_struct_member_function_args(no_const);
+        string func = parse_func(ret, args, name);
+        return func;
     }
 
     type = type ~ maybe_get_array_bounds_from_name(name);
@@ -432,15 +425,15 @@ unittest {
 }
 
 string parse_structs(JSONValue structs, string[] defs_to_exclude) {
-    import std.algorithm: canFind;
     string result;
     foreach (struct_name, struct_values; structs.object) {
         if (defs_to_exclude.canFind(struct_name)) continue;
-        string struct_result = nl("struct " ~ struct_name  ~ " {");
+        string struct_result = nl("struct %s {".format(struct_name));
         foreach (k, v; struct_values.array) {
-            auto type = parse_json_value(v["type"]);
-            if (type.canFind("ImVector_")) continue;
-            struct_result ~= nl("    " ~ format_struct_value(v) ~ ";");
+            auto name = parse_json_value!"name"(v);
+            auto type = parse_json_value!"type"(v);
+            if (type.canFind("ImVector")) continue;
+            struct_result ~= nl("    %s;".format(format_struct_value(type, name)));
         }
         struct_result ~= nl("}");
         result ~= nl(struct_result);
@@ -452,38 +445,33 @@ string parse_structs_and_enums(string text, string[] defs_to_exclude) {
     auto j = parseJSON(text);
     auto enums = nl(parse_enums(j["enums"]));
     auto structs = nl(parse_structs(j["structs"], defs_to_exclude));
-
     return wrap_extern_c(enums ~ structs);
 }
 
 string parse_typedefs(string text, string[] defs_to_exclude) {
-    import std.algorithm: canFind;
-
     auto j = parseJSON(text);
     string[] typedefs;
-    foreach (k, v; j.object) {
-        if (defs_to_exclude.canFind(k)) continue;
-        auto type = parse_type(parse_json_value(v).strip(";"));
+    foreach (name, v; j.object) {
+        if (defs_to_exclude.canFind(name)) continue;
+        auto type = parse_type(parse_json_value_to_str(v).strip(";"));
         if (type == "T" || type == "value_type*") continue;
         if (is_function_def(type)) {
-            typedefs ~= parse_function_def(k, type);
+            auto ret = get_struct_member_function_return_type(type);
+            auto args = get_struct_member_function_args(type);
+            string func = parse_func(ret, args, "function");
+            typedefs ~= "alias %s = %s".format(name, func);
         } else if (is_struct(type)) {
             typedefs ~= type;
         } else {
-            typedefs ~= "alias " ~ type ~ " " ~ k;
+            typedefs ~= "alias %s %s".format(type, name);
         }
     }
 
     string result;
     foreach (t; typedefs) {
-        result ~= nl(t ~  ";");
+        result ~= nl("%s;".format(t));
     }
     return result;
-}
-
-void write_to_file(string file_name, string text) {
-    import std.file;
-    write(file_name, text);
 }
 
 string[] get_typedefs(string text) {
@@ -505,7 +493,7 @@ string[] get_structs(string text) {
     return structs_defined;
 }
 
-string build_binds() {
+string build_binds(function_decl[] decls_to_bind) {
     auto r = `
 import core.sys.posix.dlfcn;
 import std.string;
@@ -530,8 +518,9 @@ T bind(T)(void* handle, string name) {
     if (!handle) {
         return false;
     }`);
-    foreach (d; decls) {
-       r ~= nl("    " ~ d.name ~ " = bind!" ~ d.type ~ "(handle, \"" ~ d.name ~ "\");"); 
+    auto format_bind = (function_decl d) => nl(`    %s = bind!%s(handle, "%s");`.format(d.name, d.type_name, d.name));
+    foreach (d; decls_to_bind) {
+       r ~= format_bind(d);
     }
     r ~= nl("return true;");
     r ~= nl("}");
@@ -539,31 +528,63 @@ T bind(T)(void* handle, string name) {
     return r;
 }
 
-void run() {
-    import std.file;
-
+class dimgui_module {
     string result;
-    result ~= nl("module dimgui;");
-    result ~= nl("import derelict.glfw3.glfw3;");
-    result ~= nl("import core.stdc.stdarg:va_list;");
+    this() {
+        result ~= nl("module dimgui;");
+        result ~= nl("import derelict.glfw3.glfw3;");
+        result ~= nl!2("import core.stdc.stdarg:va_list;");
+    }
 
-    auto defs = readText("./output/definitions.json");
-    auto defs_result = parse_definitions(defs);
-    result ~= nl(defs_result);
+    void append(string v) {
+        result ~= v;
+    }
 
-    auto impl_defs = readText("./output/impl_definitions.json");
-    auto impl_defs_result = parse_definitions(impl_defs);
-    result ~= nl(impl_defs_result);
+    override string toString() {
+        return result;
+    }
+}
 
-    auto structs_and_enums_defs = readText("./output/structs_and_enums.json");
+string read_file(string file_name) {
+    import std.file;
+    return readText(file_name);
+}
+
+void write_to_file(string file_name, string text) {
+    import std.file;
+    write(file_name, text);
+}
+
+void run() {
+    auto dimgui = new dimgui_module;
+    function_decl[] function_decls;
+    auto load_function_decl = new function_decl("void", "d_cimgui_init", "");
+    load_function_decl.set_type_name("d_cimgui_init_t0");
+    function_decls ~= load_function_decl;
+
+
+    auto defs_text = read_file("./output/definitions.json");
+    function_decls ~= parse_definitions(defs_text);
+
+    auto impl_defs_text = read_file("./output/impl_definitions.json");
+    function_decls ~= parse_definitions(impl_defs_text);
+
+    dimgui.append(nl!2(format_function_decls_alias_str(function_decls)));
+    dimgui.append(nl!2(format_function_decls_str(function_decls)));
+
+    auto structs_and_enums_defs = read_file("./output/structs_and_enums.json");
     auto defs_to_exclude = get_structs(structs_and_enums_defs);
-    result ~= parse_structs_and_enums(structs_and_enums_defs, null);
+    dimgui.append(
+        nl!2(parse_structs_and_enums(structs_and_enums_defs, null))
+    );
 
-    auto typedefs = readText("./output/typedefs_dict.json");
-    result ~= parse_typedefs(typedefs, defs_to_exclude);
+    auto typedefs = read_file("./output/typedefs_dict.json");
+    dimgui.append(
+        parse_typedefs(typedefs, defs_to_exclude)
+    );
 
-    result ~= build_binds();
+    dimgui.append(build_binds(function_decls));
 
-    write_to_file("./source/dimgui/gen.d", result);
-    write_to_file("./gen.d", result);
+    write_to_file("./source/dimgui/gen.d", dimgui.toString);
+    write_to_file("./gen.d", dimgui.toString);
 }
