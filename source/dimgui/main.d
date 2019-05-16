@@ -555,6 +555,10 @@ void write_to_file(string file_name, string text) {
     write(file_name, text);
 }
 
+string get_output_file(string file_name) {
+    return "./cimgui/generator/output/%s.json".format(file_name);
+}
+
 void run() {
     auto dimgui = new dimgui_module;
     function_decl[] function_decls;
@@ -562,29 +566,27 @@ void run() {
     load_function_decl.set_type_name("d_cimgui_init_t0");
     function_decls ~= load_function_decl;
 
-
-    auto defs_text = read_file("./output/definitions.json");
+    auto defs_text = read_file(get_output_file("definitions"));
     function_decls ~= parse_definitions(defs_text);
 
-    auto impl_defs_text = read_file("./output/impl_definitions.json");
+    auto impl_defs_text = read_file(get_output_file("impl_definitions"));
     function_decls ~= parse_definitions(impl_defs_text);
 
     dimgui.append(nl!2(format_function_decls_alias_str(function_decls)));
     dimgui.append(nl!2(format_function_decls_str(function_decls)));
 
-    auto structs_and_enums_defs = read_file("./output/structs_and_enums.json");
+    auto structs_and_enums_defs = read_file(get_output_file("structs_and_enums"));
     auto defs_to_exclude = get_structs(structs_and_enums_defs);
     dimgui.append(
         nl!2(parse_structs_and_enums(structs_and_enums_defs, null))
     );
 
-    auto typedefs = read_file("./output/typedefs_dict.json");
+    auto typedefs = read_file(get_output_file("typedefs_dict"));
     dimgui.append(
         parse_typedefs(typedefs, defs_to_exclude)
     );
 
     dimgui.append(build_binds(function_decls));
 
-    write_to_file("./source/dimgui/gen.d", dimgui.toString);
-    write_to_file("./gen.d", dimgui.toString);
+    write_to_file("./output/d_cimgui.d", dimgui.toString);
 }
