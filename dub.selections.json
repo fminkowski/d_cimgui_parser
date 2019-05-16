@@ -2,6 +2,7 @@
 	"fileVersion": 1,
 	"versions": {
 		"derelict-glfw3": "4.0.0-beta.1",
-		"derelict-util": "3.0.0-beta.2"
+		"derelict-util": "3.0.0-beta.2",
+		"dtest": "0.1.0"
 	}
 }

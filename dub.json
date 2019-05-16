@@ -3,7 +3,8 @@
 		"Fred Minkowski"
 	],
 	"dependencies": {
-        "derelict-glfw3": "~>4.0.0-beta.1"
+        "derelict-glfw3": "~>4.0.0-beta.1",
+        "dtest": "~>0.1.0"
 	},
 	"copyright": "Copyright © 2019, Fred Minkowski",
 	"description": "D dear imgui wrapper",

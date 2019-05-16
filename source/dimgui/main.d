@@ -1,6 +1,6 @@
 module dimgui.dimgui;
 import std.json;
-import dimgui.test;
+import dtest;
 import std.string;
 import std.stdio;
 import std.algorithm: canFind;
@@ -406,22 +406,13 @@ string format_struct_value(string type, string name) {
 }
 
 unittest {
-    void test(JSONValue v, string expected, int line = __LINE__) {
-        auto result = format_struct_value(v);
+    void test(string type, string name, string expected, int line = __LINE__) {
+        auto result = format_struct_value(type, name);
         areEqual(expected, result, "", __FILE__, line);
     }
-    JSONValue make(string type, string name) {
-        JSONValue v;
-        v["type"] = type;
-        v["name"] = name;
-        return v;
-    }
 
-    auto v = make("short", "test");
-    test(v, "short test");
-
-    v = make("unsigned short", "test");
-    test(v, "ushort test");
+    test("short", "test", "short test");
+    test("unsigned short", "test", "ushort test");
 }
 
 string parse_structs(JSONValue structs, string[] defs_to_exclude) {
