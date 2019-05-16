@@ -562,8 +562,8 @@ string get_output_file(string file_name) {
 void run() {
     auto dimgui = new dimgui_module;
     function_decl[] function_decls;
-    auto load_function_decl = new function_decl("void", "d_cimgui_init", "");
-    load_function_decl.set_type_name("d_cimgui_init_t0");
+    auto load_function_decl = new function_decl("void", "dimgui_init", "");
+    load_function_decl.set_type_name("dimgui_init_t0");
     function_decls ~= load_function_decl;
 
     auto defs_text = read_file(get_output_file("definitions"));
@@ -588,5 +588,5 @@ void run() {
 
     dimgui.append(build_binds(function_decls));
 
-    write_to_file("./output/d_cimgui.d", dimgui.toString);
+    write_to_file("./output/dimgui.d", dimgui.toString);
 }

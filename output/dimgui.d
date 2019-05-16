@@ -3,7 +3,7 @@ import derelict.glfw3.glfw3;
 import core.stdc.stdarg:va_list;
 
 extern(C) @nogc nothrow {
-alias d_cimgui_init_t0 = void function();
+alias dimgui_init_t0 = void function();
 alias ImDrawList_AddCircleFilled_t0 = void function(ImDrawList* self, ImVec2 centre, float radius, ImU32 col, int num_segments);
 alias igGetForegroundDrawList_t0 = ImDrawList* function();
 alias ImFontAtlas_GetGlyphRangesChineseFull_t0 = ImWchar* function(ImFontAtlas* self);
@@ -594,7 +594,7 @@ alias ImGui_ImplOpenGL3_RenderDrawData_t0 = void function(ImDrawData* draw_data)
 }
 
 __gshared {
-d_cimgui_init_t0 d_cimgui_init;
+dimgui_init_t0 dimgui_init;
 ImDrawList_AddCircleFilled_t0 ImDrawList_AddCircleFilled;
 igGetForegroundDrawList_t0 igGetForegroundDrawList;
 ImFontAtlas_GetGlyphRangesChineseFull_t0 ImFontAtlas_GetGlyphRangesChineseFull;
@@ -1967,7 +1967,7 @@ bool load_imgui_lib(string shared_library) {
     if (!handle) {
         return false;
     }
-    d_cimgui_init = bind!d_cimgui_init_t0(handle, "d_cimgui_init");
+    dimgui_init = bind!dimgui_init_t0(handle, "dimgui_init");
     ImDrawList_AddCircleFilled = bind!ImDrawList_AddCircleFilled_t0(handle, "ImDrawList_AddCircleFilled");
     igGetForegroundDrawList = bind!igGetForegroundDrawList_t0(handle, "igGetForegroundDrawList");
     ImFontAtlas_GetGlyphRangesChineseFull = bind!ImFontAtlas_GetGlyphRangesChineseFull_t0(handle, "ImFontAtlas_GetGlyphRangesChineseFull");
