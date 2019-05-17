@@ -1,6 +1,21 @@
-module dimgui;
+module dimgui.dimgui;
 import derelict.glfw3.glfw3;
 import core.stdc.stdarg:va_list;
+import core.sys.posix.dlfcn;
+import std.string;
+
+void* get_shared_handle(string shared_library) {
+    return dlopen(toStringz(shared_library), RTLD_NOW);
+}
+
+T bind(T)(void* handle, string name) {
+    import std.stdio;
+    auto r = cast(T)dlsym(handle, toStringz(name));
+    if (!r) {
+        writeln("Could not find symbol " ~ name);
+    }
+    return r;
+}
 
 extern(C) @nogc nothrow {
 alias dimgui_init_t0 = void function();
@@ -1945,22 +1960,6 @@ alias short ImS16;
 alias int ImGuiColorEditFlags;
 alias uint ImU64;
 alias ubyte ImU8;
-
-import core.sys.posix.dlfcn;
-import std.string;
-
-void* get_shared_handle(string shared_library) {
-    return dlopen(toStringz(shared_library), RTLD_NOW);
-}
-
-T bind(T)(void* handle, string name) {
-    import std.stdio;
-    auto r = cast(T)dlsym(handle, toStringz(name));
-    if (!r) {
-        writeln("Could not find symbol " ~ name);
-    }
-    return r;
-}
 bool dimgui_load_lib(string shared_library) {
 
     auto handle = get_shared_handle(shared_library);
@@ -2555,5 +2554,5 @@ bool dimgui_load_lib(string shared_library) {
     ImGui_ImplGlfw_MouseButtonCallback = bind!ImGui_ImplGlfw_MouseButtonCallback_t0(handle, "ImGui_ImplGlfw_MouseButtonCallback");
     ImGui_ImplGlfw_Shutdown = bind!ImGui_ImplGlfw_Shutdown_t0(handle, "ImGui_ImplGlfw_Shutdown");
     ImGui_ImplOpenGL3_RenderDrawData = bind!ImGui_ImplOpenGL3_RenderDrawData_t0(handle, "ImGui_ImplOpenGL3_RenderDrawData");
-return true;
+    return true;
 }

@@ -485,8 +485,31 @@ string[] get_structs(string text) {
 }
 
 string build_binds(function_decl[] decls_to_bind) {
-    auto r = `
-import core.sys.posix.dlfcn;
+    string r;
+    r ~= nl("bool dimgui_load_lib(string shared_library) {");
+    r ~= nl(`
+    auto handle = get_shared_handle(shared_library);
+    if (!handle) {
+        return false;
+    }`);
+    auto format_bind = (function_decl d) => nl(`    %s = bind!%s(handle, "%s");`.format(d.name, d.type_name, d.name));
+    foreach (d; decls_to_bind) {
+       r ~= format_bind(d);
+    }
+    r ~= nl("    return true;");
+    r ~= nl("}");
+
+    return r;
+}
+
+class dimgui_module {
+    string result;
+    this() {
+        result ~= nl("module dimgui.dimgui;");
+        result ~= nl("import derelict.glfw3.glfw3;");
+        result ~= nl("import core.stdc.stdarg:va_list;");
+
+        result ~= nl(`import core.sys.posix.dlfcn;
 import std.string;
 
 void* get_shared_handle(string shared_library) {
@@ -501,30 +524,7 @@ T bind(T)(void* handle, string name) {
     }
     return r;
 }
-`;
-
-    r ~= nl("bool dimgui_load_lib(string shared_library) {");
-    r ~= nl(`
-    auto handle = get_shared_handle(shared_library);
-    if (!handle) {
-        return false;
-    }`);
-    auto format_bind = (function_decl d) => nl(`    %s = bind!%s(handle, "%s");`.format(d.name, d.type_name, d.name));
-    foreach (d; decls_to_bind) {
-       r ~= format_bind(d);
-    }
-    r ~= nl("return true;");
-    r ~= nl("}");
-
-    return r;
-}
-
-class dimgui_module {
-    string result;
-    this() {
-        result ~= nl("module dimgui;");
-        result ~= nl("import derelict.glfw3.glfw3;");
-        result ~= nl!2("import core.stdc.stdarg:va_list;");
+`);
     }
 
     void append(string v) {
