@@ -13,3 +13,4 @@ dimgui-test-*
 *.o
 *.obj
 *.lst
+d_cimgui_parser*
